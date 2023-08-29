@@ -13,7 +13,7 @@ let s:save_cpo = &cpo " save user coptions
 set cpo&vim " reset them to defaults
 
 " Exposes the plugin's functions for use as commands in Neovim.
-command! -nargs=0 DecoratedYank lua require("decorated_yank").decorated_yank()
+command! -nargs=* DecoratedYank lua require("decorated_yank").decorated_yank()
 
 let &cpo = s:save_cpo " and restore after
 unlet s:save_cpo
