@@ -52,6 +52,14 @@ local function decorated_yank()
   local decoration = string.rep('-', string.len(file_name)+1)
   local start, finish, lines = get_visual_selection()
 
+  vim.fn.setreg('+', decoration .. "\n" .. "file name:" .. file_name .. "\n" .. decoration .. "\n\n" .. lines)
+end
+
+local function decorated_yank_with_link()
+  local file_name = vim.fn.expand('%')
+  local decoration = string.rep('-', string.len(file_name)+1)
+  local start, finish, lines = get_visual_selection()
+
   local fugitive = vim.cmd(start .. "," .. finish .. "GBrowse!")
   local link = vim.fn.getreg("+")
 
@@ -60,5 +68,6 @@ end
 
 
 return {
-  decorated_yank = decorated_yank
+  decorated_yank = decorated_yank,
+  decorated_yank_with_link = decorated_yank_with_link,
 }
