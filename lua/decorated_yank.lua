@@ -44,16 +44,18 @@ local function get_visual_selection()
       idx = idx + 1
     end
 
-    return table.concat(tmp_lines, "\n")
+    return csrow, cerow, table.concat(tmp_lines, "\n")
 end
-
 
 local function decorated_yank()
   local file_name = vim.fn.expand('%')
   local decoration = string.rep('-', string.len(file_name)+1)
-  local lines = get_visual_selection()
+  local start, finish, lines = get_visual_selection()
 
-  vim.fn.setreg('+', decoration .. "\n" .. file_name .. ":\n" .. decoration .. "\n\n" .. lines)
+  local fugitive = vim.cmd(start .. "," .. finish .. "GBrowse!")
+  local link = vim.fn.getreg("+")
+
+  vim.fn.setreg('+', decoration .. "\n" .. "file name:" .. file_name .. "\n\n" .. "link: " .. link .. "\n" .. decoration .. "\n\n" .. lines)
 end
 
 
