@@ -59,11 +59,18 @@ local function decorated_yank_with_link()
   local file_name = vim.fn.expand('%')
   local decoration = string.rep('-', string.len(file_name)+1)
   local start, finish, lines = get_visual_selection()
-
-  local fugitive = vim.cmd(start .. "," .. finish .. "GBrowse!")
-  local link = vim.fn.getreg("+")
-
-  vim.fn.setreg('+', decoration .. "\n" .. "file name:" .. file_name .. "\n\n" .. "link: " .. link .. "\n" .. decoration .. "\n\n" .. lines)
+  local setreg = function(link)
+    vim.fn.setreg('+', decoration .. "\n" .. "file name:" .. file_name .. "\n\n" .. "link: " .. link .. "\n" .. decoration .. "\n\n" .. lines)
+  end
+  if vim.g.loaded_fugitive then
+    local fugitive = vim.cmd(start .. "," .. finish .. "GBrowse!")
+    local link = vim.fn.getreg("+")
+    setreg(link)
+  elseif package.loaded['gitlinker'] then
+    require"gitlinker".get_buf_range_url("v", {action_callback = setreg})
+  else
+    setreg('** link unavailable - install tpope/vim-fugitive or ruifm/gitlinker.nvim to see a git link **')
+  end
 end
 
 
