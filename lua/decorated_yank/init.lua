@@ -1,3 +1,8 @@
+local utils = require("decorated_yank.utils")
+local config = require("decorated_yank.config")
+
+local M = {}
+
 local function tbl_length(T)
   local count = 0
   for _ in pairs(T) do count = count + 1 end
@@ -39,7 +44,7 @@ local function get_visual_selection()
 
     local tmp_lines = {}
     local idx = csrow
-    for i, line in ipairs(lines) do
+    for _, line in ipairs(lines) do
       table.insert(tmp_lines, idx .. " " .. line)
       idx = idx + 1
     end
@@ -47,34 +52,57 @@ local function get_visual_selection()
     return csrow, cerow, table.concat(tmp_lines, "\n")
 end
 
-local function decorated_yank()
+function M.decorated_yank()
+  local project_root = vim.fn.finddir('.git/..', vim.fn.expand('%:p:h')..';')
+  vim.fn.chdir(project_root)
+
+  local file_name = vim.fn.expand('%')
+  local decoration = string.rep('-', string.len(file_name)+1)
+  local _, _, lines = get_visual_selection()
+
+  vim.fn.setreg('+', decoration .. "\n" .. "file name: " .. file_name .. "\n" .. decoration .. "\n\n" .. lines)
+end
+
+function M.decorated_yank_with_link()
+  local project_root = vim.fn.finddir('.git/..', vim.fn.expand('%:p:h')..';')
+  vim.fn.chdir(project_root)
+
   local file_name = vim.fn.expand('%')
   local decoration = string.rep('-', string.len(file_name)+1)
   local start, finish, lines = get_visual_selection()
 
-  vim.fn.setreg('+', decoration .. "\n" .. "file name:" .. file_name .. "\n" .. decoration .. "\n\n" .. lines)
+  local url = utils.get_os_command_output({
+      "git",
+      "config",
+      "--get",
+      "remote.origin.url",
+  })[1]
+
+  local commit = utils.get_os_command_output({
+    "git",
+    "rev-parse",
+    "--verify",
+    "HEAD",
+  })[1]
+
+  local remote = ''
+
+  for _, domain in pairs(config.config["domains"]) do
+    if string.find(url, "git@" .. domain.url) then
+      remote = string.gsub(url, "git@", "https://")
+      remote = string.gsub(remote, ".git$", "")
+      remote = string.gsub(remote, domain.url .. ":", domain.url .. "/")
+      remote = remote .. domain.blob .. commit .. "/" .. file_name .. string.format(domain.line_format, start, finish)
+    end
+  end
+
+  vim.fn.setreg('+', decoration .. "\n" .. "file name: " .. file_name .. "\n\n" .. "link: " .. remote .. "\n" .. decoration .. "\n\n" .. lines)
 end
 
-local function decorated_yank_with_link()
-  local file_name = vim.fn.expand('%')
-  local decoration = string.rep('-', string.len(file_name)+1)
-  local start, finish, lines = get_visual_selection()
-  local setreg = function(link)
-    vim.fn.setreg('+', decoration .. "\n" .. "file name:" .. file_name .. "\n\n" .. "link: " .. link .. "\n" .. decoration .. "\n\n" .. lines)
-  end
-  if vim.g.loaded_fugitive then
-    local fugitive = vim.cmd(start .. "," .. finish .. "GBrowse!")
-    local link = vim.fn.getreg("+")
-    setreg(link)
-  elseif package.loaded['gitlinker'] then
-    require"gitlinker".get_buf_range_url("v", {action_callback = setreg})
-  else
-    setreg('** link unavailable - install tpope/vim-fugitive or ruifm/gitlinker.nvim to see a git link **')
-  end
+function M.setup(user_config)
+    user_config = user_config or {}
+
+    require("decorated_yank.config").setup(user_config)
 end
 
-
-return {
-  decorated_yank = decorated_yank,
-  decorated_yank_with_link = decorated_yank_with_link,
-}
+return M
