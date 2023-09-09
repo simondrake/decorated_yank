@@ -1,11 +1,70 @@
+<div align="center">
 # Decorated Yank
+##### Decorate your yanks with the filename and line numbers.
+</div>
 
-A Plugin to decorate a yank with the filename and line numbers.
+## Caution
+This plug-in is still very much in alpha phase, and breaking changes may occur until it hits `v0.1.0`.
+
+## Installation
+* neovim 0.5.0+ required
+* [nvim-lua/plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
+* install using your favorite plugin manager (`packer` in this example)
+
+```vim
+  use {
+    'simondrake/decorated_yank',
+    requires = { "nvim-lua/plenary.nvim" }
+  }
+```
+
+## Set-up
+
+If you won't be using `decorated_yank_with_link()`, you can simply call `require('decorated_yank').setup()`. If you will be using `decorated_yank_with_link()`, see the Configuration section below.
+
+## Configuration
+
+For the `decorated_yank_with_link()`, you need to tell the plug-in the format of the links you will be using. This comes in three parts:
+
+* `url` - The domain itself (e.g. `github.com`). **Note:** Do not include the schema (i.e. `https`)
+* `blob` - The format of the blob in the URL (e.g. for GitHub it's `/blob/`, for GitLab it's `/-/blob`)
+* `line_format` - The format of the line numbers (e.g. for GitHub it's `L<start>-L<end>`, for GitLab it's `L<start>-<end>`)
+
+For example, if you are working on a self-hosted instance of GitLab and GitHub, you could set-up your configuration like so:
+
+```lua
+require('decorated_yank').setup({
+  domains = {
+    github = {
+      url = "github.com",
+      blob = "/blob/",
+      line_format = "#L%s-L%s",
+    },
+    yourKeyHere = {
+      url = "your.custom.domain",
+      blob = "/-/blob/",
+      line_format = "#L%s-%s",
+    }
+  }
+})
+```
+
+**Note:** The object key (e.g. `yourKeyHere` above) is not important.
+
+## Decorating
+
+**Note:** Decorated Yank currently only works with visual selection.
+
+### File Name and Line Numbers
+
+```lua
+:'<,'>lua require('decorated_yank').decorated_yank()
+```
 
 ```go
------------------------------------------------
-file name:../../copy-paste-notes/internal/notes/notes.go
------------------------------------------------
+------------------------
+file name: internal/notes/notes.go
+------------------------
 
 15 type NoteReader interface {
 16 	ListNotes() ([]Note, error)
@@ -17,17 +76,21 @@ file name:../../copy-paste-notes/internal/notes/notes.go
 A mapping (in this case `ctrl + y`) can be defined like this:
 
 ```lua
-vim.api.nvim_set_keymap("v", "<C-y>", "<cmd>DecoratedYank<cr>", opts)
+vim.keymap.set("v", "<C-y>", function() require('decorated_yank').decorated_yank() end)
 ```
 
-Optionally, if you have [vim-fugitive](https://github.com/tpope/vim-fugitive) or [gitlinker](https://github.com/ruifm/gitlinker.nvim) installed, you can use `DecoratedYankWithLink` to include the repository link.
+### File Name, Line Numbers, and Link
+
+```lua
+:'<,'>lua require('decorated_yank').decorated_yank_with_link()
+```
 
 ```go
------------------------------------------------
-file name:../../copy-paste-notes/internal/notes/notes.go
+------------------------
+file name: internal/notes/notes.go
 
 link: https://github.com/simondrake/copy-paste-notes/blob/c8b580607a3fa2a45820f223aaaa14ed60cd54c9/internal/notes/notes.go#L15-L19
------------------------------------------------
+------------------------
 
 15 type NoteReader interface {
 16 	ListNotes() ([]Note, error)
@@ -35,3 +98,10 @@ link: https://github.com/simondrake/copy-paste-notes/blob/c8b580607a3fa2a45820f2
 18 	GetNoteByTitle(string) (*Note, error)
 19 }
 ```
+
+A mapping (in this case `ctrl + y`) can be defined like this:
+
+```lua
+vim.keymap.set("v", "<C-y>", function() require('decorated_yank').decorated_yank_with_link() end)
+```
+
