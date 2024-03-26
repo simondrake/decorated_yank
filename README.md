@@ -1,23 +1,28 @@
 <div align="center">
-  
+
 # Decorated Yank
 ##### Decorate your yanks with the filename and line numbers.
 
 </div>
 
-## Caution
-This plug-in is still very much in alpha phase, and breaking changes may occur until it hits `v0.1.0`.
-
 ## Installation
 * neovim 0.5.0+ required
 * [nvim-lua/plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
-* install using your favorite plugin manager (`packer` in this example)
+* install using your favorite plugin manager
+
+### Packer
 
 ```vim
   use {
     'simondrake/decorated_yank',
     requires = { "nvim-lua/plenary.nvim" }
   }
+```
+
+### Lazy
+
+```vim
+	{ "simondrake/decorated_yank", dependencies = { "nvim-lua/plenary.nvim" } },
 ```
 
 ## Set-up
@@ -91,7 +96,9 @@ vim.keymap.set("v", "<C-y>", function() require('decorated_yank').decorated_yank
 ------------------------
 file name: internal/notes/notes.go
 
-link: https://github.com/simondrake/copy-paste-notes/blob/c8b580607a3fa2a45820f223aaaa14ed60cd54c9/internal/notes/notes.go#L15-L19
+type name: NoteReader
+
+link: https://github.com/simondrake/copy-paste-notes/blob/9dc72ec691a561b543c3116a20413ec1d3b18beb/internal/notes/notes.go#L15-L19
 ------------------------
 
 15 type NoteReader interface {
