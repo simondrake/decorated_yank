@@ -98,6 +98,46 @@ local function get_current_node()
 	return expr:type(), vim.treesitter.get_node_text(expr:field("name")[1], 0)
 end
 
+function M.blame_link()
+	local project_root = vim.fn.finddir(".git/..", vim.fn.expand("%:p:h") .. ";")
+	vim.fn.chdir(project_root)
+
+	local file_name = vim.fn.expand("%")
+	local start, finish, _ = get_visual_selection()
+
+	local url = utils.get_os_command_output({
+		"git",
+		"config",
+		"--get",
+		"remote.origin.url",
+	})[1]
+
+	local commit = utils.get_os_command_output({
+		"git",
+		"rev-parse",
+		"--verify",
+		"HEAD",
+	})[1]
+
+	local remote = ""
+
+	for _, domain in pairs(config.config["domains"]) do
+		if string.find(url, "git@" .. domain.url) then
+			remote = string.gsub(url, "git@", "https://")
+			remote = string.gsub(remote, ".git$", "")
+			remote = string.gsub(remote, domain.url .. ":", domain.url .. "/")
+			remote = remote
+				.. domain.blame
+				.. commit
+				.. "/"
+				.. file_name
+				.. string.format(domain.line_format, start, finish)
+		end
+	end
+
+	vim.fn.setreg("+", remote)
+end
+
 function M.decorated_yank()
 	local project_root = vim.fn.finddir(".git/..", vim.fn.expand("%:p:h") .. ";")
 	vim.fn.chdir(project_root)
