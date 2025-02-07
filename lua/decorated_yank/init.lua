@@ -98,7 +98,7 @@ local function get_current_node()
 	return expr:type(), vim.treesitter.get_node_text(expr:field("name")[1], 0)
 end
 
-function M.blame_link()
+function M.blame_link_raw()
 	local project_root = vim.fn.finddir(".git/..", vim.fn.expand("%:p:h") .. ";")
 	vim.fn.chdir(project_root)
 
@@ -135,7 +135,11 @@ function M.blame_link()
 		end
 	end
 
-	vim.fn.setreg("+", remote)
+	return remote
+end
+
+function M.blame_link()
+	vim.fn.setreg("+", M.blame_link_raw())
 end
 
 function M.decorated_yank()
