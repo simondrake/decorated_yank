@@ -142,18 +142,23 @@ function M.blame_link()
 	vim.fn.setreg("+", M.blame_link_raw())
 end
 
-function M.browse_link_raw()
+function M.browse_link_raw(opts)
+	opts = opts or {}
+
 	local project_root = vim.fn.finddir(".git/..", vim.fn.expand("%:p:h") .. ";")
 	vim.fn.chdir(project_root)
 
 	local file_name = vim.fn.expand("%")
 	local start, finish
+	local has_selection = false
+
 	local mode = vim.fn.mode()
 	if mode == "v" or mode == "V" or mode == "" then
 		start, finish, _ = get_visual_selection()
-	else
-		local lnum = vim.fn.line(".")
-		start, finish = lnum, lnum
+		has_selection = true
+	elseif opts.line1 and opts.line2 then
+		start, finish = opts.line1, opts.line2
+		has_selection = true
 	end
 
 	local url = utils.get_os_command_output({
@@ -182,15 +187,17 @@ function M.browse_link_raw()
 				.. commit
 				.. "/"
 				.. file_name
-				.. string.format(domain.line_format, start, finish)
+			if has_selection then
+				remote = remote .. string.format(domain.line_format, start, finish)
+			end
 		end
 	end
 
 	return remote
 end
 
-function M.browse()
-	local url = M.browse_link_raw()
+function M.browse(opts)
+	local url = M.browse_link_raw(opts)
 	if url and url ~= "" then
 		vim.ui.open(url)
 	end
