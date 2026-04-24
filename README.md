@@ -1,47 +1,57 @@
 <div align="center">
 
 # Decorated Yank
-##### Decorate your yanks with the filename and line numbers.
+##### Yank code with context: file names, line numbers, git links, and treesitter metadata.
 
 </div>
 
+## Features
+
+- **Decorated yank** -- yank visual selection with file name and line numbers
+- **Decorated yank with link** -- same as above, plus a permalink to the code on GitHub/GitLab and treesitter context (function name, type name, etc.)
+- **Blame link** -- copy a blame URL for the visual selection to the clipboard
+- **Browse** -- open the current file (or visual selection) in the browser on GitHub/GitLab
+
+All links use the commit hash so they remain stable even as the branch moves.
+
+## Requirements
+
+- Neovim 0.10+
+- [nvim-lua/plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
+
 ## Installation
-* neovim 0.5.0+ required
-* [nvim-lua/plenary.nvim](https://github.com/nvim-lua/plenary.nvim)
-* install using your favorite plugin manager
 
-### Packer
-
-```vim
-  use {
-    'simondrake/decorated_yank',
-    requires = { "nvim-lua/plenary.nvim" }
-  }
+```lua
+-- lazy.nvim
+{
+  "simondrake/decorated_yank",
+  dependencies = { "nvim-lua/plenary.nvim" },
+  opts = {
+    domains = {
+      github = {
+        url = "github.com",
+        blob = "/blob/",
+        blame = "/blame/",
+        line_format = "#L%s-L%s",
+      },
+    },
+  },
+}
 ```
-
-### Lazy
-
-```vim
-	{ "simondrake/decorated_yank", dependencies = { "nvim-lua/plenary.nvim" } },
-```
-
-## Set-up
-
-If you won't be using `decorated_yank_with_link()` or `blame_link()`, you can simply call `require('decorated_yank').setup()`. If you will be using `decorated_yank_with_link()` or `blame_link()`, see the Configuration section below.
 
 ## Configuration
 
-For `decorated_yank_with_link()` and `blame_link()`, you need to tell the plug-in the format of the links you will be using. This comes in the following parts:
+You need to configure at least one domain so the plugin knows how to build URLs. Each domain entry has:
 
-* `url` - The domain itself (e.g. `github.com`). **Note:** Do not include the schema (i.e. `https`)
-* `blob` - The format of the blob in the URL (e.g. for GitHub it's `/blob/`, for GitLab it's `/-/blob`)
-* `blame` - The format of the blame in the URL (e.g. for GitHub it's `/blame/`, for GitLab it's `/-/blame`)
-* `line_format` - The format of the line numbers (e.g. for GitHub it's `#L<start>-L<end>`, for GitLab it's `#L<start>-<end>`)
-
-For example, if you are working on a self-hosted instance of GitLab and GitHub, you could set-up your configuration like so:
+| Key | Description | Example (GitHub) | Example (GitLab) |
+|---|---|---|---|
+| `url` | Domain without scheme | `github.com` | `gitlab.example.com` |
+| `blob` | Path segment for file views | `/blob/` | `/-/blob/` |
+| `blame` | Path segment for blame views | `/blame/` | `/-/blame/` |
+| `line_format` | Line range format string | `#L%s-L%s` | `#L%s-%s` |
 
 ```lua
-require('decorated_yank').setup({
+require("decorated_yank").setup({
   domains = {
     github = {
       url = "github.com",
@@ -49,29 +59,31 @@ require('decorated_yank').setup({
       blame = "/blame/",
       line_format = "#L%s-L%s",
     },
-    yourKeyHere = {
-      url = "your.custom.domain",
+    gitlab = {
+      url = "gitlab.example.com",
       blob = "/-/blob/",
       blame = "/-/blame/",
       line_format = "#L%s-%s",
-    }
-  }
+    },
+  },
 })
 ```
 
-**Note:** The object key (e.g. `yourKeyHere` above) is not important.
+The domain key names (e.g. `github`, `gitlab`) are arbitrary -- the plugin matches on the `url` field against the git remote.
 
-## Decorating
+## Usage
 
-**Note:** Decorated Yank currently only works with visual selection.
+### Decorated Yank
 
-### File Name and Line Numbers
+Yanks the visual selection with file name and line numbers.
 
 ```lua
-:'<,'>lua require('decorated_yank').decorated_yank()
+:'<,'>lua require("decorated_yank").decorated_yank()
 ```
 
-```go
+Output copied to clipboard:
+
+```
 ------------------------
 file name: internal/notes/notes.go
 ------------------------
@@ -83,25 +95,23 @@ file name: internal/notes/notes.go
 19 }
 ```
 
-A mapping (in this case `ctrl + y`) can be defined like this:
+### Decorated Yank with Link
+
+Yanks the visual selection with file name, treesitter context, a permalink, and line numbers.
 
 ```lua
-vim.keymap.set("v", "<C-y>", function() require('decorated_yank').decorated_yank() end)
+:'<,'>lua require("decorated_yank").decorated_yank_with_link()
 ```
 
-### File Name, Line Numbers, and Link
+Output copied to clipboard:
 
-```lua
-:'<,'>lua require('decorated_yank').decorated_yank_with_link()
 ```
-
-```go
 ------------------------
 file name: internal/notes/notes.go
 
 type name: NoteReader
 
-link: https://github.com/simondrake/copy-paste-notes/blob/9dc72ec691a561b543c3116a20413ec1d3b18beb/internal/notes/notes.go#L15-L19
+link: https://github.com/simondrake/copy-paste-notes/blob/9dc72ec/internal/notes/notes.go#L15-L19
 ------------------------
 
 15 type NoteReader interface {
@@ -111,32 +121,68 @@ link: https://github.com/simondrake/copy-paste-notes/blob/9dc72ec691a561b543c311
 19 }
 ```
 
-A mapping (in this case `ctrl + y`) can be defined like this:
+Treesitter context is included when the cursor is inside a recognized node (`function_declaration`, `method_declaration`, or `type_spec`).
+
+### Blame Link
+
+Copies a blame URL for the visual selection to the system clipboard.
 
 ```lua
-vim.keymap.set("v", "<C-y>", function() require('decorated_yank').decorated_yank_with_link() end)
+:'<,'>lua require("decorated_yank").blame_link()
 ```
 
-## Blame Link
+Copies a URL like `https://github.com/simondrake/genc/blame/2e0754b/main.go#L6-L6`.
 
-When using the `blame_link()` function, the plugin will place the blame link, of the visually selected lines, into the system clipboard.
+The raw URL string is also available via `blame_link_raw()` if you want to use it programmatically.
+
+### Browse
+
+Opens the current file in the browser on GitHub/GitLab. Works in both normal mode (current line) and visual mode (selected range).
 
 ```lua
-:'<,'>lua require('decorated_yank').blame_link()
+-- Open in browser
+:lua require("decorated_yank").browse()
+
+-- Copy the URL to clipboard instead
+:lua vim.fn.setreg("+", require("decorated_yank").browse_link_raw())
 ```
 
-This will copy a URL such as `https://github.com/simondrake/genc/blame/2e0754b33382a965fdc1bb93097fbf68bdae20d6/main.go#L6-L6`.
-
-A mapping (in this case ctrl + b) can be defined like this:
+## Example Keymaps and Commands
 
 ```lua
-vim.keymap.set("v", "<C-b>", function() require('decorated_yank').blame_link() end)
+-- Decorated yank with link (visual mode)
+vim.keymap.set("v", "<C-y>", function()
+  require("decorated_yank").decorated_yank_with_link()
+end)
+
+-- Blame link to clipboard (visual mode)
+vim.api.nvim_create_user_command("GBlame", function()
+  require("decorated_yank").blame_link()
+end, { range = true })
+
+-- Open blame in browser (visual mode)
+vim.api.nvim_create_user_command("GBlameO", function()
+  vim.ui.open(require("decorated_yank").blame_link_raw())
+end, { range = true })
+
+-- Browse file in browser (normal + visual mode)
+vim.api.nvim_create_user_command("GBrowse", function()
+  require("decorated_yank").browse()
+end, { range = true })
+
+-- Copy browse link to clipboard (normal + visual mode)
+vim.api.nvim_create_user_command("GBrowseY", function()
+  vim.fn.setreg("+", require("decorated_yank").browse_link_raw())
+end, { range = true })
 ```
 
-A command (in this case `GBlame`) can be defined like this:
+## API
 
-```lua
-vim.api.nvim_create_user_command('GBlame', function(_)
-  require('decorated_yank').blame_link()
-end, { nargs = 0, range = true })
-```
+| Function | Mode | Description |
+|---|---|---|
+| `decorated_yank()` | Visual | Yank selection with file name and line numbers |
+| `decorated_yank_with_link()` | Visual | Yank selection with file name, treesitter context, and permalink |
+| `blame_link()` | Visual | Copy blame URL to clipboard |
+| `blame_link_raw()` | Visual | Return blame URL as a string |
+| `browse()` | Normal/Visual | Open file in browser |
+| `browse_link_raw()` | Normal/Visual | Return browse URL as a string |

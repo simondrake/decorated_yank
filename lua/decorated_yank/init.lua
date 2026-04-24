@@ -142,6 +142,60 @@ function M.blame_link()
 	vim.fn.setreg("+", M.blame_link_raw())
 end
 
+function M.browse_link_raw()
+	local project_root = vim.fn.finddir(".git/..", vim.fn.expand("%:p:h") .. ";")
+	vim.fn.chdir(project_root)
+
+	local file_name = vim.fn.expand("%")
+	local start, finish
+	local mode = vim.fn.mode()
+	if mode == "v" or mode == "V" or mode == "" then
+		start, finish, _ = get_visual_selection()
+	else
+		local lnum = vim.fn.line(".")
+		start, finish = lnum, lnum
+	end
+
+	local url = utils.get_os_command_output({
+		"git",
+		"config",
+		"--get",
+		"remote.origin.url",
+	})[1]
+
+	local commit = utils.get_os_command_output({
+		"git",
+		"rev-parse",
+		"--verify",
+		"HEAD",
+	})[1]
+
+	local remote = ""
+
+	for _, domain in pairs(config.config["domains"]) do
+		if string.find(url, "git@" .. domain.url) then
+			remote = string.gsub(url, "git@", "https://")
+			remote = string.gsub(remote, ".git$", "")
+			remote = string.gsub(remote, domain.url .. ":", domain.url .. "/")
+			remote = remote
+				.. domain.blob
+				.. commit
+				.. "/"
+				.. file_name
+				.. string.format(domain.line_format, start, finish)
+		end
+	end
+
+	return remote
+end
+
+function M.browse()
+	local url = M.browse_link_raw()
+	if url and url ~= "" then
+		vim.ui.open(url)
+	end
+end
+
 function M.decorated_yank()
 	local project_root = vim.fn.finddir(".git/..", vim.fn.expand("%:p:h") .. ";")
 	vim.fn.chdir(project_root)
