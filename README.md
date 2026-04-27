@@ -135,6 +135,20 @@ Copies a URL like `https://github.com/simondrake/genc/blame/2e0754b/main.go#L6-L
 
 The raw URL string is also available via `blame_link_raw()` if you want to use it programmatically.
 
+### Blame At
+
+Opens a blame URL for a specific commit, file, and line in the browser. Designed for programmatic use by other plugins (e.g. [nvim-review](https://github.com/simondrake/nvim-review)).
+
+```lua
+-- Open blame in browser
+require("decorated_yank").blame_at(hash, file, line, { cwd = "/path/to/repo" })
+
+-- Get the URL as a string
+local url = require("decorated_yank").blame_at_raw(hash, file, line, { cwd = "/path/to/repo" })
+```
+
+The `cwd` option specifies the git repository directory, which is important when the current buffer isn't inside the target repo (e.g. when called from a scratch buffer).
+
 ### Browse
 
 Opens the current file in the browser on GitHub/GitLab. In normal mode it links to the file; in visual mode it includes the selected line range.
@@ -190,5 +204,7 @@ end, { range = true })
 | `decorated_yank_with_link()` | Visual | Yank selection with file name, treesitter context, and permalink |
 | `blame_link()` | Visual | Copy blame URL to clipboard |
 | `blame_link_raw()` | Visual | Return blame URL as a string |
+| `blame_at(hash, file, line, opts?)` | Programmatic | Open blame URL in browser for a specific commit/file/line |
+| `blame_at_raw(hash, file, line, opts?)` | Programmatic | Return blame URL as a string for a specific commit/file/line |
 | `browse(opts?)` | Normal/Visual | Open file in browser (pass `line1`/`line2` for range) |
 | `browse_link_raw(opts?)` | Normal/Visual | Return browse URL as a string (pass `line1`/`line2` for range) |
