@@ -3,35 +3,61 @@ local config = require("decorated_yank.config")
 
 local M = {}
 
-local function tbl_length(T)
-	local count = 0
-	for _ in pairs(T) do
-		count = count + 1
+local function escape_pattern(s)
+	return s:gsub("([%.%^%$%(%)%%])", "%%%1")
+end
+
+local function get_repo_info()
+	local file_dir = vim.fn.expand("%:p:h")
+	local root = utils.get_os_command_output({ "git", "-C", file_dir, "rev-parse", "--show-toplevel" })[1]
+
+	local abs = vim.fn.expand("%:p")
+	local rel = abs
+	if root and abs:sub(1, #root) == root then
+		rel = abs:sub(#root + 2)
 	end
-	return count
+
+	local url = utils.get_os_command_output({ "git", "-C", file_dir, "config", "--get", "remote.origin.url" })[1]
+	local commit = utils.get_os_command_output({ "git", "-C", file_dir, "rev-parse", "--verify", "HEAD" })[1]
+
+	if not root or not url or not commit then
+		return nil
+	end
+
+	local domain
+	for _, d in pairs(config.config["domains"]) do
+		if string.find(url, "git@" .. escape_pattern(d.url)) then
+			domain = d
+			break
+		end
+	end
+
+	if not domain then
+		return nil
+	end
+
+	local base = string.gsub(url, "git@", "https://")
+	base = string.gsub(base, "%.git$", "")
+	base = string.gsub(base, escape_pattern(domain.url) .. ":", domain.url .. "/")
+
+	return rel, base, commit, domain
 end
 
 local function get_visual_selection()
-	-- this will exit visual mode
-	-- use 'gv' to reselect the text
 	local _, csrow, cscol, cerow, cecol
 	local mode = vim.fn.mode()
-	if mode == "v" or mode == "V" or mode == "" then
-		-- if we are in visual mode use the live position
+	if mode == "v" or mode == "V" or mode == "" then
 		_, csrow, cscol, _ = unpack(vim.fn.getpos("."))
 		_, cerow, cecol, _ = unpack(vim.fn.getpos("v"))
 		if mode == "V" then
-			-- visual line doesn't provide columns
 			cscol, cecol = 0, 999
 		end
-		-- exit visual mode
 		vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", true)
 	else
-		-- otherwise, use the last known visual position
 		_, csrow, cscol, _ = unpack(vim.fn.getpos("'<"))
 		_, cerow, cecol, _ = unpack(vim.fn.getpos("'>"))
 	end
-	-- swap vars if needed
+
 	if cerow < csrow then
 		csrow, cerow = cerow, csrow
 	end
@@ -40,12 +66,10 @@ local function get_visual_selection()
 	end
 
 	local lines = vim.fn.getline(csrow, cerow)
-	-- local n = cerow-csrow+1
-	local n = tbl_length(lines)
-	if n <= 0 then
+	if #lines == 0 then
 		return ""
 	end
-	lines[n] = string.sub(lines[n], 1, cecol)
+	lines[#lines] = string.sub(lines[#lines], 1, cecol)
 	lines[1] = string.sub(lines[1], cscol)
 
 	local tmp_lines = {}
@@ -59,8 +83,6 @@ local function get_visual_selection()
 end
 
 local function get_current_node()
-	-- Only continue if treesitter has an active parser
-	-- avoids the "no parser for language error"
 	local buf = vim.api.nvim_get_current_buf()
 	local highlighter = require("vim.treesitter.highlighter")
 
@@ -98,44 +120,23 @@ local function get_current_node()
 	return expr:type(), vim.treesitter.get_node_text(expr:field("name")[1], 0)
 end
 
-function M.blame_link_raw()
-	local project_root = vim.fn.finddir(".git/..", vim.fn.expand("%:p:h") .. ";")
-	vim.fn.chdir(project_root)
+local function build_link(base, path_segment, commit, file_name, domain, start, finish)
+	local link = base .. path_segment .. commit .. "/" .. file_name
+	if start and finish then
+		link = link .. string.format(domain.line_format, start, finish)
+	end
+	return link
+end
 
-	local file_name = vim.fn.expand("%")
+function M.blame_link_raw()
+	local file_name, base, commit, domain = get_repo_info()
+	if not file_name then
+		vim.notify("decorated_yank: not in a git repository or no matching domain configured", vim.log.levels.WARN)
+		return ""
+	end
 	local start, finish, _ = get_visual_selection()
 
-	local url = utils.get_os_command_output({
-		"git",
-		"config",
-		"--get",
-		"remote.origin.url",
-	})[1]
-
-	local commit = utils.get_os_command_output({
-		"git",
-		"rev-parse",
-		"--verify",
-		"HEAD",
-	})[1]
-
-	local remote = ""
-
-	for _, domain in pairs(config.config["domains"]) do
-		if string.find(url, "git@" .. domain.url) then
-			remote = string.gsub(url, "git@", "https://")
-			remote = string.gsub(remote, ".git$", "")
-			remote = string.gsub(remote, domain.url .. ":", domain.url .. "/")
-			remote = remote
-				.. domain.blame
-				.. commit
-				.. "/"
-				.. file_name
-				.. string.format(domain.line_format, start, finish)
-		end
-	end
-
-	return remote
+	return build_link(base, domain.blame, commit, file_name, domain, start, finish)
 end
 
 function M.blame_link()
@@ -145,55 +146,22 @@ end
 function M.browse_link_raw(opts)
 	opts = opts or {}
 
-	local project_root = vim.fn.finddir(".git/..", vim.fn.expand("%:p:h") .. ";")
-	vim.fn.chdir(project_root)
+	local file_name, base, commit, domain = get_repo_info()
+	if not file_name then
+		vim.notify("decorated_yank: not in a git repository or no matching domain configured", vim.log.levels.WARN)
+		return ""
+	end
 
-	local file_name = vim.fn.expand("%")
 	local start, finish
-	local has_selection = false
 
 	local mode = vim.fn.mode()
 	if mode == "v" or mode == "V" or mode == "" then
 		start, finish, _ = get_visual_selection()
-		has_selection = true
 	elseif opts.line1 and opts.line2 then
 		start, finish = opts.line1, opts.line2
-		has_selection = true
 	end
 
-	local url = utils.get_os_command_output({
-		"git",
-		"config",
-		"--get",
-		"remote.origin.url",
-	})[1]
-
-	local commit = utils.get_os_command_output({
-		"git",
-		"rev-parse",
-		"--verify",
-		"HEAD",
-	})[1]
-
-	local remote = ""
-
-	for _, domain in pairs(config.config["domains"]) do
-		if string.find(url, "git@" .. domain.url) then
-			remote = string.gsub(url, "git@", "https://")
-			remote = string.gsub(remote, ".git$", "")
-			remote = string.gsub(remote, domain.url .. ":", domain.url .. "/")
-			remote = remote
-				.. domain.blob
-				.. commit
-				.. "/"
-				.. file_name
-			if has_selection then
-				remote = remote .. string.format(domain.line_format, start, finish)
-			end
-		end
-	end
-
-	return remote
+	return build_link(base, domain.blob, commit, file_name, domain, start, finish)
 end
 
 function M.browse(opts)
@@ -204,10 +172,7 @@ function M.browse(opts)
 end
 
 function M.decorated_yank()
-	local project_root = vim.fn.finddir(".git/..", vim.fn.expand("%:p:h") .. ";")
-	vim.fn.chdir(project_root)
-
-	local file_name = vim.fn.expand("%")
+	local file_name = get_repo_info() or vim.fn.expand("%")
 	local decoration = string.rep("-", string.len(file_name) + 1)
 	local _, _, lines = get_visual_selection()
 
@@ -215,43 +180,16 @@ function M.decorated_yank()
 end
 
 function M.decorated_yank_with_link()
-	local project_root = vim.fn.finddir(".git/..", vim.fn.expand("%:p:h") .. ";")
-	vim.fn.chdir(project_root)
-
-	local file_name = vim.fn.expand("%")
+	local file_name, base, commit, domain = get_repo_info()
+	if not file_name then
+		vim.notify("decorated_yank: not in a git repository or no matching domain configured", vim.log.levels.WARN)
+		return
+	end
 	local node_type, node_name = get_current_node()
 	local decoration = string.rep("-", string.len(file_name) + 1)
 	local start, finish, lines = get_visual_selection()
 
-	local url = utils.get_os_command_output({
-		"git",
-		"config",
-		"--get",
-		"remote.origin.url",
-	})[1]
-
-	local commit = utils.get_os_command_output({
-		"git",
-		"rev-parse",
-		"--verify",
-		"HEAD",
-	})[1]
-
-	local remote = ""
-
-	for _, domain in pairs(config.config["domains"]) do
-		if string.find(url, "git@" .. domain.url) then
-			remote = string.gsub(url, "git@", "https://")
-			remote = string.gsub(remote, ".git$", "")
-			remote = string.gsub(remote, domain.url .. ":", domain.url .. "/")
-			remote = remote
-				.. domain.blob
-				.. commit
-				.. "/"
-				.. file_name
-				.. string.format(domain.line_format, start, finish)
-		end
-	end
+	local remote = build_link(base, domain.blob, commit, file_name, domain, start, finish)
 
 	if node_type == "type_spec" then
 		node_type = "type name: "

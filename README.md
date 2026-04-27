@@ -12,7 +12,7 @@
 - **Blame link** -- copy a blame URL for the visual selection to the clipboard
 - **Browse** -- open the current file (or visual selection) in the browser on GitHub/GitLab
 
-All links use the commit hash so they remain stable even as the branch moves.
+All links use the commit hash so they remain stable even as the branch moves. Git worktrees are fully supported.
 
 ## Requirements
 
@@ -75,7 +75,7 @@ The domain key names (e.g. `github`, `gitlab`) are arbitrary -- the plugin match
 
 ### Decorated Yank
 
-Yanks the visual selection with file name and line numbers.
+Yanks the visual selection with file name and line numbers. Works outside of git repos (links are omitted).
 
 ```lua
 :'<,'>lua require("decorated_yank").decorated_yank()
@@ -137,7 +137,7 @@ The raw URL string is also available via `blame_link_raw()` if you want to use i
 
 ### Browse
 
-Opens the current file in the browser on GitHub/GitLab. Works in both normal mode (current line) and visual mode (selected range).
+Opens the current file in the browser on GitHub/GitLab. In normal mode it links to the file; in visual mode it includes the selected line range.
 
 ```lua
 -- Open in browser
@@ -166,13 +166,19 @@ vim.api.nvim_create_user_command("GBlameO", function()
 end, { range = true })
 
 -- Browse file in browser (normal + visual mode)
-vim.api.nvim_create_user_command("GBrowse", function()
-  require("decorated_yank").browse()
+vim.api.nvim_create_user_command("GBrowse", function(opts)
+  require("decorated_yank").browse({
+    line1 = opts.range > 0 and opts.line1 or nil,
+    line2 = opts.range > 0 and opts.line2 or nil,
+  })
 end, { range = true })
 
 -- Copy browse link to clipboard (normal + visual mode)
-vim.api.nvim_create_user_command("GBrowseY", function()
-  vim.fn.setreg("+", require("decorated_yank").browse_link_raw())
+vim.api.nvim_create_user_command("GBrowseY", function(opts)
+  vim.fn.setreg("+", require("decorated_yank").browse_link_raw({
+    line1 = opts.range > 0 and opts.line1 or nil,
+    line2 = opts.range > 0 and opts.line2 or nil,
+  }))
 end, { range = true })
 ```
 
@@ -184,5 +190,5 @@ end, { range = true })
 | `decorated_yank_with_link()` | Visual | Yank selection with file name, treesitter context, and permalink |
 | `blame_link()` | Visual | Copy blame URL to clipboard |
 | `blame_link_raw()` | Visual | Return blame URL as a string |
-| `browse()` | Normal/Visual | Open file in browser |
-| `browse_link_raw()` | Normal/Visual | Return browse URL as a string |
+| `browse(opts?)` | Normal/Visual | Open file in browser (pass `line1`/`line2` for range) |
+| `browse_link_raw(opts?)` | Normal/Visual | Return browse URL as a string (pass `line1`/`line2` for range) |
